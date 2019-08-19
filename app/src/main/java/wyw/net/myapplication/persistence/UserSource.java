@@ -5,20 +5,12 @@ import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
 import io.reactivex.FlowableOnSubscribe;
+import wyw.net.myapplication.rx.FlowableSource;
 
 public class UserSource {
     public static User user;
-    private FlowableEmitter<String> emitter;
-    private FlowableOnSubscribe<String> flowableSource = new FlowableOnSubscribe<String>() {
-        @Override
-        public void subscribe(FlowableEmitter<String> emitter) throws Exception {
-            UserSource.this.emitter = emitter;
-            if (user != null) {
-                emitter.onNext(user.name);
-            }
-        }
-    };
-//    private Flowable flowable = ;
+    //todo 可以使用map  然后代码编译时自动生成
+    private FlowableSource<String> source;
 
     /**
      * 模拟room 存储数据
@@ -32,7 +24,10 @@ public class UserSource {
         return Completable.create(emitter -> {
             try {
                 emitter.onComplete();
-                this.emitter.onNext(user.name);
+                if (source != null) {
+                    //数据修改通知 通知页面修改
+                    source.emitter.onNext(user.name);
+                }
             } catch (Exception e) {
                 emitter.onError(e);
             }
@@ -45,8 +40,16 @@ public class UserSource {
      * @return
      */
     public Flowable<String> getUserName() {
-        return Flowable.create(flowableSource, BackpressureStrategy.DROP);
+        if (source == null) {
+            source = new FlowableSource<>(emitter -> {
+                if (user != null) {
+                    emitter.onNext(user.name);
+                }
+            });
+        }
+        return Flowable.create(source.subscribe, BackpressureStrategy.DROP);
     }
+
 
     public Flowable<Integer> getUserAge() {
         return Flowable.create(new FlowableOnSubscribe<Integer>() {
